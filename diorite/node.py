@@ -30,7 +30,8 @@ class Node:
         self.players = {}
 
     def __repr__(self):
-        return f'<DioriteNode player_count={len(self.players.keys())} available={self.available}>'
+        return f'<DioriteNode player_count={len(self.players.keys())} identifier={self.identifier!r} ' \
+               f'available={self.available}>'
 
     @property
     def headers(self) -> dict:

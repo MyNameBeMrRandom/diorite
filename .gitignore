@@ -1,0 +1,13 @@
+*.pyc
+*.png
+*.ini
+*.iml
+*.xml
+
+venv/
+.idea/
+.git/
+build/
+dist/
+diorite.egg-info/
+docs/_build/

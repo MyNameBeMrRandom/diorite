@@ -85,4 +85,3 @@ class Music(commands.Cog):
 
 MyBot().run('Your bots token')
 ```
-test

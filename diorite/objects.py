@@ -1,5 +1,7 @@
 import re
 
+from . import exceptions
+
 
 class Track:
 
@@ -32,8 +34,7 @@ class Track:
 
     @property
     def thumbnail(self):
-
-        return f'https://img.youtube.com/vi/{self.identifier}/maxresdefault.jpg' if self.yt_id else None
+        return f'https://img.youtube.com/vi/{self.identifier}/hqdefault.jpg' if self.yt_id else None
 
 
 class Playlist:
@@ -81,3 +82,116 @@ class Stats:
 
     def __repr__(self):
         return f'<DioriteStats active_players={self.active_players} players={self.players}>'
+
+
+class Filter:
+
+    __slots__ = 'payload'
+
+    def __init__(self):
+        self.payload = {"filters": None}
+
+    def __repr__(self):
+        return f'<DioriteBaseFilter payload={self.payload}'
+
+
+class Timescale(Filter):
+
+    __slots__ = ('speed', 'pitch', 'rate')
+
+    def __init__(self, *, speed: float, pitch: float, rate: float):
+        super().__init__()
+
+        self.speed = speed
+        self.pitch = pitch
+        self.rate = rate
+
+        self.payload = {
+            "timescale": {
+                "speed": self.speed,
+                "pitch": self.pitch,
+                "rate": self.rate
+            }
+        }
+
+    def __repr__(self):
+        return f"<DioriteTimescaleFilter speed={self.speed} pitch={self.pitch} rate={self.rate}>"
+
+
+class Karaoke(Filter):
+
+    __slots__ = ('level', 'mono_level', 'filter_band', 'filter_width')
+
+    def __init__(self, *, level: float, mono_level: float, filter_band: float, filter_width: float):
+        super().__init__()
+
+        self.level = level
+        self.mono_level = mono_level
+        self.filter_band = filter_band
+        self.filter_width = filter_width
+
+        self.payload = {
+            "karaoke": {
+                "level": self.level,
+                "monoLevel": self.mono_level,
+                "filterBand": self.filter_band,
+                "filterWidth": self.filter_width
+            }
+        }
+
+    def __repr__(self):
+        return f"<DioriteKaraokeFilter level={self.level} mono_level={self.mono_level} " \
+               f"filter_band={self.filter_band} filter_width={self.filter_width}>"
+
+
+class Tremolo(Filter):
+
+    __slots__ = ('frequency', 'depth')
+
+    def __init__(self, *, frequency: float, depth: float):
+        super().__init__()
+
+        if frequency < 0:
+            raise exceptions.InvalidFilterParam("Tremolo frequency must be more than 0.0")
+        if depth < 0 or depth >= 1:
+            raise exceptions.InvalidFilterParam("Tremolo depth must be between 0.0 and 1.0")
+
+        self.frequency = frequency
+        self.depth = depth
+
+        self.payload = {
+            "tremolo": {
+                "frequency": self.frequency,
+                "depth": self.depth
+            }
+        }
+
+    def __repr__(self):
+        return f"<DioriteTremoloFilter frequency={self.frequency} depth={self.depth}>"
+
+
+class Vibrato(Filter):
+
+    __slots__ = ('frequency', 'depth')
+
+    def __init__(self, *, frequency: float, depth: float):
+        super().__init__()
+
+        if frequency < 0 or frequency >= 14:
+            raise exceptions.InvalidFilterParam("Vibrato frequency must be between 0.0 and 14.0.")
+        if depth < 0 or depth >= 1:
+            raise exceptions.InvalidFilterParam("Vibrato depth must be between 0.0 and 1.0.")
+
+        self.frequency = frequency
+        self.depth = depth
+
+        self.payload = {
+            "vibrato": {
+                "frequency": self.frequency,
+                "depth": self.depth
+            }
+        }
+
+    def __repr__(self):
+        return f"<DioriteVibratoFilter frequency={self.frequency} depth={self.depth}>"
+

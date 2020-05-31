@@ -40,3 +40,7 @@ class TrackLoadError(TrackException):
 
 class TrackInvalidPosition(TrackException):
     pass
+
+
+class InvalidFilterParam(DioriteException):
+    pass

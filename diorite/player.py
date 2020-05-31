@@ -190,3 +190,30 @@ class Player:
 
         return position
 
+    async def set_filter(self, filter_type: objects.Filter) -> objects.Filter:
+
+        await self.node.send(op="filters", guildId=str(self.guild.id), **filter_type.payload)
+        return filter_type
+
+    async def set_timescale(self, *, speed: float = 1, pitch: float = 1, rate: float = 1) -> objects.Filter:
+
+        return await self.set_filter(objects.Timescale(speed=speed, pitch=pitch, rate=rate))
+
+    async def set_karaoke(self, *, level: float = 1, mono_level: float = 1,
+                          filter_band: float = 220, filter_width: float = 100) -> objects.Filter:
+
+        return await self.set_filter(objects.Karaoke(level=level, mono_level=mono_level,
+                                                     filter_band=filter_band, filter_width=filter_width))
+
+    async def set_tremolo(self, *, frequency: float = 2, depth: float = 0.5) -> objects.Filter:
+
+        return await self.set_filter(objects.Tremolo(frequency=frequency, depth=depth))
+
+    async def set_vibrato(self, frequency: float = 2, depth: float = 0.5) -> objects.Filter:
+
+        return await self.set_filter(objects.Vibrato(frequency=frequency, depth=depth))
+
+
+
+
+

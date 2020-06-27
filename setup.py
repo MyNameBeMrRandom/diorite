@@ -11,16 +11,15 @@ with open('README.md') as f:
 setuptools.setup(
     name='diorite',
     author='twitch0001 and MyNameBeMrRandom',
-    version='0.1.0',
+    version='0.1.1',
     url='https://github.com/iDevision/diorite',
     packages=setuptools.find_packages(),
-    licence='APGL-3.0',
+    license='APGL-3.0',
     description='A python wrapper for LavaLink intended for use with discord.py.',
     long_description=readme,
     long_description_content_type='text/markdown',
     include_package_data=True,
     install_requires=requirements,
-    extra_require=None,
     classifiers=[
         'Framework :: AsyncIO',
         'Natural Language :: English',

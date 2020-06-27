@@ -34,7 +34,7 @@ class Track:
 
     @property
     def thumbnail(self):
-        return f'https://img.youtube.com/vi/{self.identifier}/hqdefault.jpg' if self.yt_id else None
+        return f'https://img.youtube.com/vi/{self.identifier}/mqdefault.jpg' if self.yt_id else None
 
 
 class Playlist:

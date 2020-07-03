@@ -1,6 +1,6 @@
 """Made by twitch0001 and MyNameBeMrRandom"""
 
-__version__ = '0.1.1'
+__version__ = '0.1.3'
 __title__ = 'diorite'
 __license__ = 'APGL-3.0'
 __author__ = 'twitch0001 and MyNameBeMrRandom'

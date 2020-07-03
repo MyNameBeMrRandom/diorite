@@ -11,7 +11,7 @@ with open('README.md') as f:
 setuptools.setup(
     name='diorite',
     author='twitch0001 and MyNameBeMrRandom',
-    version='0.1.1',
+    version='0.1.3',
     url='https://github.com/iDevision/diorite',
     packages=setuptools.find_packages(),
     license='APGL-3.0',

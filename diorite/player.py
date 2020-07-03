@@ -113,7 +113,7 @@ class Player:
     async def disconnect(self) -> None:
 
         await self.get_shard_socket(self.guild.shard_id).voice_state(self.guild.id, None)
-        __log__.info(f"Player '{self.guild.id}' has disconnected from voice channel {self.voice_channel.id!r}.")
+        __log__.info(f"Player '{self.guild}' has disconnected from voice channel {self.voice_channel}.")
 
         self.voice_channel = None
 

@@ -25,9 +25,12 @@ class Player:
         self.volume = 100
         self.paused = False
         self.current = None
+        self.filter = None
+        self.equalizer = objects.Equalizer.flat()
 
         self.voice_state = {}
         self.player_state = {}
+
         self.last_position = 0
         self.last_update = 0
         self.time = 0
@@ -45,7 +48,7 @@ class Player:
 
     @property
     def is_paused(self) -> bool:
-        return self.is_connected and self.paused is True
+        return self.paused is True
 
     @property
     def position(self) -> float:
@@ -60,9 +63,14 @@ class Player:
             return min(self.last_position, self.current.length)
 
         difference = (time.time() * 1000) - self.last_update
-        return min(self.last_position + difference, self.current.length)
+        position = self.last_position + difference
 
-    async def update_state(self, data: dict) -> None:
+        if position > self.current.length:
+            return 0
+
+        return min(position, self.current.length)
+
+    async def _update_state(self, data: dict) -> None:
 
         state = data.get('state')
 
@@ -70,18 +78,16 @@ class Player:
         self.last_position = state.get('position', 0)
         self.time = state.get('time', 0)
 
-    async def voice_server_update(self, data: dict) -> None:
+    async def _voice_server_update(self, data: dict) -> None:
 
-        __log__.debug(f"Player '{self.guild.id}' has received a voice server update.")
+        __log__.debug(f'Player \'{self.guild.id}\' received a voice server update | {data}')
         self.voice_state.update({'event': data})
 
-        __log__.debug(f"Player '{self.guild.id}' has dispatched a voice update.")
-        if {'sessionId', 'event'} == self.voice_state.keys():
-            await self.node.send(op='voiceUpdate', guildId=str(self.guild.id), **self.voice_state)
+        await self._dispatch_voice_update()
 
-    async def voice_state_update(self, data: dict) -> None:
+    async def _voice_state_update(self, data: dict) -> None:
 
-        __log__.debug(f"Player '{self.guild.id}' has received a voice state update.")
+        __log__.debug(f'Player \'{self.guild.id}\' received a voice state update | {data}')
         self.voice_state.update({'sessionId': data['session_id']})
 
         channel_id = data['channel_id']
@@ -90,12 +96,16 @@ class Player:
             return
 
         self.voice_channel = self.bot.get_channel(int(channel_id))
+        await self._dispatch_voice_update()
 
-        __log__.debug(f"Player '{self.guild.id}' has dispatched a voice update.")
+    async def _dispatch_voice_update(self) -> None:
+
+        __log__.debug(f'Player \'{self.guild.id}\' has dispatched a voice update.')
+
         if {'sessionId', 'event'} == self.voice_state.keys():
-            await self.node.send(op='voiceUpdate', guildId=str(self.guild.id), **self.voice_state)
+            await self.node.websocket.send(op='voiceUpdate', guildId=str(self.guild.id), **self.voice_state)
 
-    def get_shard_socket(self, shard_id: int) -> typing.Optional[DiscordWebSocket]:
+    def _get_shard_socket(self, shard_id: int) -> typing.Optional[DiscordWebSocket]:
 
         if isinstance(self.bot, commands.AutoShardedBot):
             return self.bot.shards[shard_id].ws
@@ -105,19 +115,25 @@ class Player:
 
     async def connect(self, voice_channel: discord.VoiceChannel) -> None:
 
-        await self.get_shard_socket(self.guild.shard_id).voice_state(self.guild.id, str(voice_channel.id))
         self.voice_channel = voice_channel
+        await self._get_shard_socket(self.guild.shard_id).voice_state(self.guild.id, str(voice_channel.id))
 
-        __log__.info(f"Player '{self.guild.id}' has connected to voice channel {self.voice_channel.id!r}.")
+        __log__.info(f'Player \'{self.guild.id}\' has connected to voice channel \'{self.voice_channel.id}\'.')
 
     async def disconnect(self) -> None:
 
-        await self.get_shard_socket(self.guild.shard_id).voice_state(self.guild.id, None)
-        __log__.info(f"Player '{self.guild}' has disconnected from voice channel {self.voice_channel}.")
+        __log__.info(f'Player \'{self.guild.id}\' has disconnected from voice channel \'{self.voice_channel.id}\'.')
 
         self.voice_channel = None
+        await self._get_shard_socket(self.guild.shard_id).voice_state(self.guild.id, None)
 
-    async def play(self, track: objects.Track, no_replace: bool = False, start: int = 0, end: int = 0) -> objects.Track:
+    async def play(self, track: objects.Track, no_replace: bool = False, start: int = 0, end: int = 0):
+
+        if no_replace is False or not self.is_playing:
+            self.last_update = 0
+            self.last_position = 0
+            self.time = 0
+            self.paused = False
 
         payload = {
             'op': 'play',
@@ -130,20 +146,15 @@ class Player:
         if 0 < end < track.length:
             payload['endTime'] = end
 
-        await self.node.send(**payload)
+        await self.node.websocket.send(**payload)
         self.current = track
 
-        __log__.info(f"Player '{self.guild.id}' has started playing track {self.current!r}.")
-        return self.current
+        __log__.info(f'Player \'{self.guild.id}\' has started playing track {self.current!r}.')
 
-    async def stop(self, force: bool = True) -> None:
+    async def stop(self) -> None:
 
-        if not self.current and force is False:
-            __log__.warning(f"Player '{self.guild.id}' attempted to stop with no current track.")
-            return
-
-        await self.node.send(op='stop', guildId=str(self.guild.id))
-        __log__.info(f"Player '{self.guild.id}' has stopped playing track {self.current!r}.")
+        await self.node.websocket.send(op='stop', guildId=str(self.guild.id))
+        __log__.info(f'Player \'{self.guild.id}\' has stopped playing track {self.current!r}.')
 
         self.current = None
 
@@ -152,68 +163,62 @@ class Player:
         await self.stop()
         await self.disconnect()
 
-        await self.node.send(op='destroy', guildId=str(self.guild.id))
+        await self.node.websocket.send(op='destroy', guildId=str(self.guild.id))
         del self.node.players[self.guild.id]
 
-        __log__.info(f"Player '{self.guild.id}' has been destroyed.")
+        __log__.info(f'Player \'{self.guild.id}\' has been destroyed.')
 
-    async def set_pause(self, pause: bool) -> bool:
+    async def set_pause(self, pause: bool) -> None:
 
-        await self.node.send(op='pause', guildId=str(self.guild.id), pause=pause)
+        await self.node.websocket.send(op='pause', guildId=str(self.guild.id), pause=pause)
         self.paused = pause
 
-        __log__.info(f"Player '{self.guild.id}' pause has been set '{self.paused}'.")
+        __log__.info(f'Player \'{self.guild.id}\' pause has been set to \'{self.paused}\'.')
 
-        return self.paused
+    async def set_volume(self, volume: int) -> None:
 
-    async def set_volume(self, volume: int) -> int:
-
-        await self.node.send(op='volume', guildId=str(self.guild.id), volume=volume)
+        await self.node.websocket.send(op='volume', guildId=str(self.guild.id), volume=volume)
         self.volume = volume
 
-        __log__.info(f"Player '{self.guild.id}' volume has been set '{self.volume}'.")
+        __log__.info(f'Player \'{self.guild.id}\' volume has been set to \'{self.volume}\'.')
 
-        return self.volume
-
-    async def seek(self, position: int) -> typing.Optional[float]:
+    async def seek(self, position: int) -> None:
 
         if not self.current:
-            __log__.warning(f"Player '{self.guild.id}' attempted to seek with no current track.")
+            __log__.warning(f'Player \'{self.guild.id}\' attempted to seek with no current track.')
             return
 
         if position < 0 or position > self.current.length:
-            __log__.warning(f"Player '{self.guild.id}' attempted to seek to invalid position.")
+            __log__.warning(f'Player \'{self.guild.id}\' attempted to seek to invalid position.')
             raise exceptions.TrackInvalidPosition(f'Track seek position must be between 0 and track length.')
 
-        await self.node.send(op='seek', guildId=str(self.guild.id), position=position)
-        __log__.info(f"Player '{self.guild.id}' position has been set '{self.position}'.")
+        await self.node.websocket.send(op='seek', guildId=str(self.guild.id), position=position)
+        __log__.info(f'Player \'{self.guild.id}\' position has been set to \'{self.position}\'.')
 
-        return position
+    async def set_equalizer(self, equalizer: objects.Equalizer):
 
-    async def set_filter(self, filter_type: objects.Filter) -> objects.Filter:
+        await self.node.websocket.send(op='equalizer', guildId=str(self.guild.id), bands=equalizer.eq)
+        self.equalizer = equalizer
 
-        await self.node.send(op="filters", guildId=str(self.guild.id), **filter_type.payload)
-        return filter_type
+        __log__.info(f'Player \'{self.guild.id}\' equalizer has been set to {equalizer!r}.')
 
-    async def set_timescale(self, *, speed: float = 1, pitch: float = 1, rate: float = 1) -> objects.Filter:
+    async def set_filter(self, filter_type: objects.Filter):
+
+        await self.node.websocket.send(op="filters", guildId=str(self.guild.id), **filter_type.payload)
+        self.filter = filter_type
+
+        __log__.info(f'Player \'{self.guild.id}\'  has had {filter_type!r} filter applied.')
+
+    async def set_timescale(self, *, speed: float = 1, pitch: float = 1, rate: float = 1):
 
         return await self.set_filter(objects.Timescale(speed=speed, pitch=pitch, rate=rate))
 
-    async def set_karaoke(self, *, level: float = 1, mono_level: float = 1,
-                          filter_band: float = 220, filter_width: float = 100) -> objects.Filter:
-
-        return await self.set_filter(objects.Karaoke(level=level, mono_level=mono_level,
-                                                     filter_band=filter_band, filter_width=filter_width))
-
-    async def set_tremolo(self, *, frequency: float = 2, depth: float = 0.5) -> objects.Filter:
+    async def set_tremolo(self, *, frequency: float = 2, depth: float = 0.5):
 
         return await self.set_filter(objects.Tremolo(frequency=frequency, depth=depth))
 
-    async def set_vibrato(self, frequency: float = 2, depth: float = 0.5) -> objects.Filter:
+    async def set_karaoke(self, *, level: float = 1, mono_level: float = 1,
+                          filter_band: float = 220, filter_width: float = 100):
 
-        return await self.set_filter(objects.Vibrato(frequency=frequency, depth=depth))
-
-
-
-
-
+        return await self.set_filter(objects.Karaoke(level=level, mono_level=mono_level,
+                                                     filter_band=filter_band, filter_width=filter_width))

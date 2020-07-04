@@ -16,11 +16,12 @@ __log__ = logging.getLogger(__name__)
 
 class Client:
 
-    def __init__(self, bot: typing.Union[commands.Bot, commands.AutoShardedBot], loop=None, session=None):
+    def __init__(self, bot: typing.Union[commands.Bot, commands.AutoShardedBot],
+                 loop=None, session: aiohttp.ClientSession = None):
 
         self.bot = bot
-        self.loop = loop if loop else asyncio.get_event_loop()
-        self.session = session if session else aiohttp.ClientSession(loop=self.loop)
+        self.loop = loop or asyncio.get_event_loop()
+        self.session = session or aiohttp.ClientSession(loop=self.loop)
 
         self.nodes = {}
 
@@ -42,7 +43,7 @@ class Client:
             except KeyError:
                 return
             else:
-                await player.voice_server_update(data['d'])
+                await player._voice_server_update(data['d'])
 
         elif data['t'] == 'VOICE_STATE_UPDATE':
 
@@ -55,7 +56,7 @@ class Client:
             except KeyError:
                 return
             else:
-                await player.voice_state_update(data['d'])
+                await player._voice_state_update(data['d'])
 
     @property
     def players(self) -> typing.Mapping[int, Player]:
@@ -66,19 +67,21 @@ class Client:
 
         return {player.guild.id: player for player in players}
 
-    async def create_node(self, host: str, port: int, identifier: str,
-                          password: str = None, secure: bool = False) -> Node:
+    async def create_node(self, host: str, port: str, identifier: str, password: str, secure: bool = False) -> Node:
 
         await self.bot.wait_until_ready()
 
         if identifier in self.nodes.keys():
             raise exceptions.NodeCreationError(f'Node with identifier {identifier!r} already exists.')
 
-        __log__.info(f'Node {identifier!r} attempting connection.')
+        __log__.debug(f'Node \'{identifier}\' attempting connection.')
+
         node = Node(client=self, host=host, port=port, identifier=identifier, password=password, secure=secure)
         await node.connect()
 
         self.nodes[node.identifier] = node
+
+        __log__.info(f'Node \'{identifier}\' connected.')
         return node
 
     def get_node(self, identifier: str = None) -> typing.Optional[Node]:
@@ -86,15 +89,12 @@ class Client:
         if not self.nodes:
             raise exceptions.NodesNotAvailable('There are no nodes available.')
 
-        if not identifier:
+        if not identifier:  # TODO Find a better way of finding the best node, this is crappy.
             return random.choice([node for node in self.nodes.values() if node.available])
-        else:
-            return self.nodes.get(identifier, None)
+
+        return self.nodes.get(identifier, None)
 
     def get_player(self, guild: discord.Guild, cls: typing.Type[Player] = Player, **kwargs) -> Player:
-
-        if not self.nodes:
-            raise exceptions.NodesNotAvailable('There are no nodes available.')
 
         try:
             player = self.players[guild.id]
@@ -103,6 +103,9 @@ class Client:
         else:
             return player
 
+        if not self.nodes:
+            raise exceptions.NodesNotAvailable('There are no nodes available.')
+
         if not cls:
             cls = Player
 
@@ -110,5 +113,5 @@ class Client:
         player = cls(node, guild, **kwargs)
         node.players[guild.id] = player
 
-        __log__.info(f"Player for guild '{guild.id}' was created.")
+        __log__.info(f'Player for guild \'{guild.id}\' was created.')
         return self.players[guild.id]

@@ -1,77 +1,104 @@
 
 
 class DioriteEvent:
-
-    def __init__(self):
-
-        self.name = 'null_event'
-        self.type = 'NullEvent'
+    pass
 
 
 class TrackStartEvent(DioriteEvent):
 
-    def __init__(self, player, data: dict):
+    def __init__(self, data: dict):
         super().__init__()
 
-        self.player = player
         self.name = 'track_start'
 
-        self.type = data['type']
-        self.track = data['track']
+        self.type = data.get('type')
+        self.player = data.get('player')
+
+        self.track = data.get('track')
+
+    def __str__(self):
+        return self.type
+
+    def __repr__(self):
+        return f'<{self.type} player={self.player!r}'
 
 
 class TrackEndEvent(DioriteEvent):
 
-    def __init__(self, player, data: dict):
+    def __init__(self, data: dict):
         super().__init__()
 
-        self.player = player
         self.name = 'track_end'
 
-        self.type = data['type']
-        self.track = data['track']
+        self.type = data.get('type')
+        self.player = data.get('player')
 
-        self.reason = data['reason']
+        self.track = data.get('track')
+        self.reason = data.get('reason')
+
+    def __str__(self):
+        return self.type
+
+    def __repr__(self):
+        return f'<{self.type} reason={self.reason} player={self.player!r}'
 
 
 class TrackStuckEvent(DioriteEvent):
 
-    def __init__(self, player, data: dict):
+    def __init__(self, data: dict):
         super().__init__()
 
-        self.player = player
         self.name = 'track_stuck'
 
-        self.type = data['type']
-        self.track = data['track']
+        self.type = data.get('type')
+        self.player = data.get('player')
 
-        self.threshold = data['thresholdMs']
+        self.track = data.get('track')
+        self.threshold = data.get('thresholdMs')
+
+    def __str__(self):
+        return self.type
+
+    def __repr__(self):
+        return f'<{self.type} threshold={self.threshold} player={self.player!r}'
 
 
 class TrackExceptionEvent(DioriteEvent):
 
-    def __init__(self, player, data: dict):
+    def __init__(self, data: dict):
         super().__init__()
 
-        self.player = player
         self.name = 'track_error'
 
-        self.type = data['type']
-        self.track = data['track']
+        self.type = data.get('type')
+        self.player = data.get('player')
 
-        self.error = data['error']
+        self.track = data.get('track')
+        self.error = data.get('error')
+
+    def __str__(self):
+        return self.type
+
+    def __repr__(self):
+        return f'<{self.type} error={self.error} player={self.player!r}'
 
 
-class WebSocketClosed(DioriteEvent):
+class WebSocketClosedEvent(DioriteEvent):
 
-    def __init__(self, player, data: dict):
+    def __init__(self, data: dict):
         super().__init__()
 
-        self.player = player
         self.name = 'websocket_closed'
 
-        self.type = data['type']
+        self.type = data.get('type')
+        self.player = data.get('player')
 
-        self.code = data['code']
-        self.reason = data['reason']
-        self.by_remote = data['byRemote']
+        self.code = data.get('code')
+        self.reason = data.get('reason')
+        self.by_remote = data.get('byRemote')
+
+    def __str__(self):
+        return self.type
+
+    def __repr__(self):
+        return f'<{self.type} code={self.code} reason={self.reason} by_remote={self.by_remote} player={self.player!r}'

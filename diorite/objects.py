@@ -1,3 +1,4 @@
+import collections
 import re
 
 from . import exceptions
@@ -60,8 +61,9 @@ class Playlist:
 
 class Stats:
 
-    __slots__ = ('active_players', 'players', 'uptime', 'memory', 'memory_reservable', 'memory_allocated',
-                 'memory_used', 'memory_free', 'cpu', 'cpu_system_load', 'cpu_lavalink_load', 'cpu_cores')
+    __slots__ = ('active_players', 'players', 'uptime', 'memory_reservable', 'memory_allocated', 'memory_used',
+                 'memory_free', 'cpu_system_load', 'cpu_lavalink_load', 'cpu_cores', 'frames_sent',
+                 'frames_nulled', 'frames_deficit')
 
     def __init__(self, stats: dict):
 
@@ -69,16 +71,21 @@ class Stats:
         self.players = stats.get('players', 0)
         self.uptime = stats.get('uptime', 0)
 
-        self.memory = stats.get('memory', {})
-        self.memory_reservable = self.memory.get('reservable', 0)
-        self.memory_allocated = self.memory.get('allocated', 0)
-        self.memory_used = self.memory.get('used', 0)
-        self.memory_free = self.memory.get('free', 0)
+        memory = stats.get('memory', {})
+        self.memory_reservable = memory.get('reservable', -1)
+        self.memory_allocated = memory.get('allocated', -1)
+        self.memory_used = memory.get('used', -1)
+        self.memory_free = memory.get('free', -1)
 
-        self.cpu = stats.get('cpu', {})
-        self.cpu_system_load = self.cpu.get('systemLoad', 0.0)
-        self.cpu_lavalink_load = self.cpu.get('lavalinkLoad', 0.0)
-        self.cpu_cores = self.cpu.get('cores', 0)
+        cpu = stats.get('cpu', {})
+        self.cpu_lavalink_load = cpu.get('lavalinkLoad', -1)
+        self.cpu_system_load = cpu.get('systemLoad', -1)
+        self.cpu_cores = cpu.get('cores', -1)
+
+        frame_stats = stats.get('frameStats', {})
+        self.frames_deficit = frame_stats.get('deficit', -1)
+        self.frames_nulled = frame_stats.get('nulled', -1)
+        self.frames_sent = frame_stats.get('sent', -1)
 
     def __repr__(self):
         return f'<DioriteStats active_players={self.active_players} players={self.players}>'
@@ -170,28 +177,82 @@ class Tremolo(Filter):
         return f"<DioriteTremoloFilter frequency={self.frequency} depth={self.depth}>"
 
 
-class Vibrato(Filter):
+class Equalizer:
 
-    __slots__ = ('frequency', 'depth')
+    def __init__(self):
+        self.eq = None
+        raise NotImplementedError
 
-    def __init__(self, *, frequency: float, depth: float):
-        super().__init__()
+    @staticmethod
+    def _factory(levels: list):
+        _dict = collections.defaultdict(int)
 
-        if frequency < 0 or frequency >= 14:
-            raise exceptions.InvalidFilterParam("Vibrato frequency must be between 0.0 and 14.0.")
-        if depth < 0 or depth >= 1:
-            raise exceptions.InvalidFilterParam("Vibrato depth must be between 0.0 and 1.0.")
+        _dict.update(levels)
+        _dict = [{"band": i, "gain": _dict[i]} for i in range(15)]
 
-        self.frequency = frequency
-        self.depth = depth
+        return _dict
 
-        self.payload = {
-            "vibrato": {
-                "frequency": self.frequency,
-                "depth": self.depth
-            }
-        }
+    @classmethod
+    def build(cls, *, levels: list):
 
-    def __repr__(self):
-        return f"<DioriteVibratoFilter frequency={self.frequency} depth={self.depth}>"
+        self = cls.__new__(cls)
+        self.eq = cls._factory(levels)
+        self.raw = levels
 
+        cls.__str__ = lambda _: 'CustomEqualizer'
+        return self
+
+    @classmethod
+    def flat(cls):
+
+        levels = [(0, .0), (1, .0), (2, .0), (3, .0), (4, .0),
+                  (5, .0), (6, .0), (7, .0), (8, .0), (9, .0),
+                  (10, .0), (11, .0), (12, .0), (13, .0), (14, .0)]
+        self = cls.__new__(cls)
+        self.eq = cls._factory(levels)
+        self.raw = levels
+
+        cls.__str__ = lambda _: 'Flat'
+        return self
+
+    @classmethod
+    def boost(cls):
+
+        levels = [(0, -0.075), (1, .125), (2, .125), (3, .1), (4, .1),
+                  (5, .05), (6, 0.075), (7, .0), (8, .0), (9, .0),
+                  (10, .0), (11, .0), (12, .125), (13, .15), (14, .05)]
+
+        self = cls.__new__(cls)
+        self.eq = cls._factory(levels)
+        self.raw = levels
+
+        cls.__str__ = lambda _: 'Boost'
+        return self
+
+    @classmethod
+    def metal(cls):
+
+        levels = [(0, .0), (1, .1), (2, .1), (3, .15), (4, .13),
+                  (5, .1), (6, .0), (7, .125), (8, .175), (9, .175),
+                  (10, .125), (11, .125), (12, .1), (13, .075), (14, .0)]
+
+        self = cls.__new__(cls)
+        self.eq = cls._factory(levels)
+        self.raw = levels
+
+        cls.__str__ = lambda _: 'Metal'
+        return self
+
+    @classmethod
+    def piano(cls):
+
+        levels = [(0, -0.25), (1, -0.25), (2, -0.125), (3, 0.0),
+                  (4, 0.25), (5, 0.25), (6, 0.0), (7, -0.25), (8, -0.25),
+                  (9, 0.0), (10, 0.0), (11, 0.5), (12, 0.25), (13, -0.025)]
+
+        self = cls.__new__(cls)
+        self.eq = cls._factory(levels)
+        self.raw = levels
+
+        cls.__str__ = lambda _: 'Piano'
+        return self

@@ -130,9 +130,6 @@ class Player:
     async def play(self, track: objects.Track, no_replace: bool = False, start: int = 0, end: int = 0):
 
         if no_replace is False or not self.is_playing:
-            self.last_update = 0
-            self.last_position = 0
-            self.time = 0
             self.paused = False
 
         payload = {

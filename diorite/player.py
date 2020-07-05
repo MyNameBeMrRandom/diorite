@@ -129,9 +129,6 @@ class Player:
 
     async def play(self, track: objects.Track, no_replace: bool = False, start: int = 0, end: int = 0):
 
-        if no_replace is False or not self.is_playing:
-            self.paused = False
-
         payload = {
             'op': 'play',
             'guildId': str(self.guild.id),

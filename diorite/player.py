@@ -161,7 +161,9 @@ class Player:
     async def destroy(self) -> None:
 
         await self.stop()
-        await self.disconnect()
+
+        if self.is_connected:
+            await self.disconnect()
 
         await self.node.websocket.send(op='destroy', guildId=str(self.guild.id))
         del self.node.players[self.guild.id]
